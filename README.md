@@ -1,9 +1,13 @@
 # ReadCalcium
+
+## Requirements
+- GGPlot2
+
+## Description
 Takes a XLS file (which in actuality is a tab delimited text file with the extension changed to XLS), subtracts background from each collumn (each of which represents a cell), then splits it into two tables, 340 and 380. 
+At the end, it generates 4 graphs: 340, 380, 340/380, and 340/380 as % of Dynamic Range. These are exported as PDFs
 
-At the end, it generates 4 graphs: 340, 380, 340/380, and 340/380 as % of Dynamic Range
-
-This script assumes:
+## Assumptions
 - Your file structure is static and identical to the way that I had it when I built it.
 - The first collumn, and thus likely the first ROI entered, was the background.
 - The baseline, before conditions were added, was taken at 5 points, each a minute inbetween, starting at 0.

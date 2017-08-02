@@ -8,6 +8,9 @@ readCalcium <- function(dateArg, ...) {
   # TODO:
   # General Polish
   # Maybe have Ionomycin not default?
+  # Report Signal to noise on graph?
+  # In % dynamic range, use max within ionomycin instead of final point
+  # Read CSV (Or check if CSV and read accordingly?)
   
   conditionNames <- c(..., "Ionomycin")
 
@@ -66,51 +69,40 @@ readCalcium <- function(dateArg, ...) {
   dynamicR <- sweep(as.matrix(dynamicCalcium), 2, as.matrix(dynamicRange), "/")
   dynamicR <- as.data.frame(dynamicR)
   
-  ## Unfinished
-  
   # Produces data frames, then saves formated plot to the folder from which the data came.
   calcium380 <- data.frame(x = finalIntervalTimes, y = stack(calcium380))
   calcium340 <- data.frame(x = finalIntervalTimes, y = stack(calcium340))
   calciumRatio <- data.frame(x = finalIntervalTimes, y = stack(calciumRatio))
   dynamicR <- data.frame(x = finalIntervalTimes, y = stack(dynamicR))
   
+  # Template Theme and Geoms
+  calciumPlot <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), geom_point(), geom_line(), geom_vline(xintercept = (conditionAddTimes), color = "red"))
+  
   # 380 Plot
   ggplot(data = calcium380, aes(x=calcium380$x, y=calcium380$y.values, color = calcium380$y.ind)) + 
-    geom_point() + 
-    geom_line() + 
+    calciumPlot +
     labs(x = "Time (min)", y = "", title = "380") + 
-    theme(plot.title = element_text(hjust = 0.5), legend.position ="none") + 
-    geom_vline(xintercept = (conditionAddTimes), color = "red") +
     annotate("text", x=conditionAddTimes, y=max(calcium380[2]), label = conditionNames, size=10)
   ggsave("380.pdf", device = "pdf", width = 16, height = 9, units = "in")
   
   # 340 Plot
   ggplot(data = calcium340, aes(x=calcium340$x, y=calcium340$y.values, color = calcium340$y.ind)) +
-    geom_point() + 
-    geom_line() + 
+    calciumPlot + 
     labs(x = "Time (min)", y = "", title = "340") + 
-    theme(plot.title = element_text(hjust = 0.5), legend.position ="none") + 
-    geom_vline(xintercept = (conditionAddTimes), color = "red") +
     annotate("text", x=conditionAddTimes, y=max(calcium340[2]), label = conditionNames, size=10)
   ggsave("340.pdf", device = "pdf", width = 16, height = 9, units = "in")
   
   # 340/380 Plot
   ggplot(data = calciumRatio, aes(x=calciumRatio$x, y=calciumRatio$y.values, color = calciumRatio$y.ind)) + 
-    geom_point() + 
-    geom_line() + 
+    calciumPlot + 
     labs(x = "Time (min)", y = "", title = "340/380") + 
-    theme(plot.title = element_text(hjust = 0.5), legend.position ="none") + 
-    geom_vline(xintercept = (conditionAddTimes), color = "red") +
     annotate("text", x=conditionAddTimes, y=max(calciumRatio[2]), label = conditionNames, size=10)
   ggsave(paste("340\\380.pdf"), device = "pdf", width = 16, height = 9, units = "in")
   
   # 340/380 as % Dynamic Range Plot
   ggplot(data = dynamicR, aes(x=dynamicR$x, y=dynamicR$y.values, color = dynamicR$y.ind)) + 
-    geom_point() + 
-    geom_line() + 
+    calciumPlot + 
     labs(x = "Time (min)", y = "", title = "340/380 as % Dynamic Ratio") + 
-    theme(plot.title = element_text(hjust = 0.5), legend.position ="none") + 
-    geom_vline(xintercept = (conditionAddTimes), color = "red") +
     annotate("text", x=conditionAddTimes, y=max(dynamicR[2]), label = conditionNames, size=10)
   ggsave(paste("340\\380 As %% Dynamic Ratio.pdf"), device = "pdf", width = 16, height = 9, units = "in")
 }

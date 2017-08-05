@@ -12,8 +12,8 @@ At the end, it generates 4 graphs: 340, 380, 340/380, and 340/380 as % of Dynami
 - Your file structure is static and identical to the way that I had it when I built it.
 - The first collumn, and thus likely the first ROI entered, was the background.
 - The baseline, before conditions were added, was taken at 5 points, each a minute inbetween, starting at 0.
-- Ionomycin at the end, with an interval of 0, 0.5, 1, 2, 3.
-- All other conditions have an interval of  0, 0.5, 1, 2, 3, 5
+- Ionomycin at the end, with an interval of 0.5, 1, 2, 3.
+- All other conditions have an interval of 0.5, 1, 2, 3, 5
 
 This script is a bit fiddly. It's my first project, and is really only made for me.
 

@@ -10,6 +10,7 @@ readCalciumNewMethod <- function(dateArg, ...) {
   # Read CSV (Or check if CSV and read accordingly?)
   # Calculate max avg for each cond?
   # Port to Shiny?
+  # Allow for change of sensitivity in slope divergence, with a default of 50
   
   # Initiate Variables
   conds <- c(..., "Ionomycin")
@@ -23,13 +24,13 @@ readCalciumNewMethod <- function(dateArg, ...) {
   
   # Loops for each cond and appends the time - not including Ionomycin time, which has its own interval.
   for (i in 1:(length(conds) - 1)){
-    addtlCond <- condInterval + tail(interval, n=1)
+    addtlCond <- condInterval + tail(interval, n = 1)
     interval <- c(interval, addtlCond)
-    addTimes <- c(addTimes, tail(interval + 1, n=1))
+    addTimes <- c(addTimes, tail(interval + 1, n = 1))
   }
   
   # Tacks on ionomycin time
-  ionomycinInterval <- tail(interval, n=1) + c(1.5, 2, 3, 4)
+  ionomycinInterval <- tail(interval, n = 1) + c(1.5, 2, 3, 4)
   condTimes <- c(interval, ionomycinInterval)
   
   # Reads and wrangles tab delimited file. If Lab folder position changes, this will break!
@@ -37,11 +38,11 @@ readCalciumNewMethod <- function(dateArg, ...) {
   setwd(path)
   
   calFile <- read.delim(paste0(dateArg,"Results.xls"))
-  calFile <- calFile[,-1]
+  calFile <- calFile[ ,-1]
   
   # Subtracts background from each cell
-  minusBG <- mutate_all(calFile, function(x) {x - calFile[,1]})
-  minusBG <- minusBG[,-1]
+  minusBG <- mutate_all(calFile, function(x) {x - calFile[ ,1]})
+  minusBG <- minusBG[ ,-1]
   
   # Creates vectors of odd and even rows. Assumes 340 was first
   cal340 <- minusBG[seq(1, nrow(minusBG), 2),]
@@ -83,7 +84,8 @@ readCalciumNewMethod <- function(dateArg, ...) {
   calPlot <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), geom_point(), geom_line(), geom_vline(xintercept = (addTimes), color = "red"))
   
   # To keep ggplot happy when working with rectangles
-  commonData <- aes(x=calRatio$x, y=calRatio$y.values, color = calRatio$y.ind)
+  commonData_1 <- aes(x=calRatio$x, y=calRatio$y.values, color = calRatio$y.ind)
+  commonData_2 <- aes(x=dynamicR$x, y=dynamicR$y.values, color = dynamicR$y.ind)
   
   # 380 Plot
   ggplot(data = cal380, aes(x=cal380$x, y=cal380$y.values, color = cal380$y.ind)) + 
@@ -102,8 +104,8 @@ readCalciumNewMethod <- function(dateArg, ...) {
   # 340/380 Plot
   ggplot(data = calRatio) + 
     theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)) +
-    geom_point(commonData) +
-    geom_line(commonData) +
+    geom_point(commonData_1) +
+    geom_line(commonData_1) +
     geom_vline(xintercept = (addTimes), color = "red") +
     labs(x = "Time (min)", y = "", title = "340/380") + 
     annotate("text", x=addTimes, y=max(calRatio[2]), label = conds, size=10)+
@@ -111,9 +113,13 @@ readCalciumNewMethod <- function(dateArg, ...) {
   ggsave(paste("340\\380.pdf"), device = "pdf", width = 16, height = 9, units = "in")
   
   # 340/380 as % Dynamic Range Plot
-  ggplot(data = dynamicR, aes(x=dynamicR$x, y=dynamicR$y.values, color = dynamicR$y.ind)) + 
-    calPlot + 
+  ggplot(data = dynamicR) + 
+    theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)) +
+    geom_point(commonData_2) +
+    geom_line(commonData_2) +
+    geom_vline(xintercept = (addTimes), color = "red") +
     labs(x = "Time (min)", y = "", title = "340/380 as % Dynamic Ratio") + 
-    annotate("text", x=addTimes, y=max(dynamicR[2]), label = conds, size=10)
+    annotate("text", x=addTimes, y=max(dynamicR[2]), label = conds, size=10) +
+    geom_rect(data = rects, aes(xmin = xstart, xmax = xend, ymin = -Inf, ymax = Inf), fill = "darkslategray4", alpha = .2)
   ggsave(paste("340\\380 As %% Dynamic Ratio.pdf"), device = "pdf", width = 16, height = 9, units = "in")
 }

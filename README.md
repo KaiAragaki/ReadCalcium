@@ -1,7 +1,8 @@
 # ReadCalcium
 
 ## Requirements
-- GGPlot2
+- ggplot2
+- dplyr
 
 ## Description
 Takes a XLS file (which in actuality is a tab delimited text file with the extension changed to XLS), subtracts background from each collumn (each of which represents a cell), then splits it into two tables, 340 and 380. 

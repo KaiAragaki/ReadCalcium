@@ -1,16 +1,4 @@
-readCalciumNewMethod <- function(dateArg, ...) {
-  
-  # Notes:
-  # This takes in an xls file, which in actuality is a tab-delimited text file with an xls extension. Saving things as xls simply will not do. They will not be able to be opened by this program.
-  # This function takes the date of which the experiment was performed and a list of cond names, not including ionomycin
-  # This program requires a strict file structure. If the file is moved, this program will cease to work until either file location or path to file changes to match.
-  
-  # TO DO
-  # Maybe have Ionomycin not default?
-  # Read CSV (Or check if CSV and read accordingly?)
-  # Calculate max avg for each cond?
-  # Port to Shiny?
-  # Allow for change of sensitivity in slope divergence, with a default of 50
+readCalciumTester <- function(dateArg, ...) {
   
   # Initiate Variables
   conds <- c(..., "Ionomycin")
@@ -34,9 +22,8 @@ readCalciumNewMethod <- function(dateArg, ...) {
   condTimes <- c(interval, ionomycinInterval)
   
   # Reads and wrangles tab delimited file. If Lab folder position changes, this will break!
-  path <- file.path("~", "Desktop", "Lab", "Experiments", "Calcium", "By Subject", "INS 832:3 Glucose Response", dateArg)
-  setwd(path)
-  
+  path <- file.path("~", "Desktop", "Lab", "Experiments", "Calcium", "By Subject", "INS 832:3 Glucose Response", dateArg) %>%
+  setwd()
   calFile <- read.delim(paste0(dateArg,"Results.xls"))
   calFile <- calFile[ ,-1]
   
@@ -44,29 +31,23 @@ readCalciumNewMethod <- function(dateArg, ...) {
   minusBG <- mutate_all(calFile, function(x) {x - calFile[ ,1]})
   minusBG <- minusBG[ ,-1]
   
-  # Creates vectors of odd and even rows. Assumes 340 was first
-  cal340 <- minusBG[seq(1, nrow(minusBG), 2),]
+  # Creates vectors of odd and even rows. Assumes 340 was first. Calculates ratio.
+  cal340 <- minusBG[seq(1, nrow(minusBG), 2),] # Want to make it so I can just put them in a dataframe right at the get go
   cal380 <- minusBG[seq(2, nrow(minusBG), 2),]
-  
-  # Stores 340/380
   calRatio <- cal340/cal380
-  rownames(calRatio) <- condTimes
   
   # Represents as % dynamic range
   baseline <- colMeans(calRatio[1:5,])
   maxIono <- apply(tail(calRatio), 2, function(x) max(x))
-  dynamicR <- sweep(sweep(calRatio, 2, baseline, "-"), 2, (maxIono - baseline), "/")
+  dynamicR <- sweep(sweep(calRatio, 2, baseline, "-"), 2, (maxIono - baseline), "/") * 100
   
   # Row means for finding slope means
   rowMeans380 <- rowMeans(cal380)
   rowMeans340 <- rowMeans(cal340)
-
-  # Produces data frames, then saves formated plot to the folder whence the data came.
-  cal380 <- data.frame(x = condTimes, y = stack(cal380))
-  cal340 <- data.frame(x = condTimes, y = stack(cal340))
-  calRatio <- data.frame(x = condTimes, y = stack(calRatio))
-  dynamicR <- data.frame(x = condTimes, y = stack(dynamicR))
   
+  # Putting it all together...
+  calDF <- data.frame("Condition Times" = condTimes, "380" = stack(cal380), "340" = stack(cal340), "340/380" = stack(cal340/cal380), "340/380 Dyn" = stack(dynamicR))
+ 
   # Loops through row means and checks to see if, on average, the slopes diverge.
   for (i in 1:(length(condTimes)-1)){
     if(rowMeans380[i] - rowMeans380[i+1] > 50 & rowMeans340[i + 1] - rowMeans340[i] > 50  | rowMeans380[i+1] - rowMeans380[i] > 50 & rowMeans340[i] - rowMeans340[i + 1] > 50){
@@ -77,49 +58,48 @@ readCalciumNewMethod <- function(dateArg, ...) {
   divergeStart <- divergeStart[!is.na(divergeStart)]
   divergeEnd <- divergeEnd[!is.na(divergeEnd)]
   rects <- data.frame(xstart = divergeStart, xend = divergeEnd)
-
+  
   # Plots -----------------------------------------------------
-    
+  
   # Template Theme and Geoms
-  calPlot <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), geom_point(), geom_line(), geom_vline(xintercept = (addTimes), color = "red"))
+  calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_vline(xintercept = (addTimes), color = "red", alpha = 0.5))
+  calPlot <- list(calCommon, geom_point(), geom_line())
   
   # To keep ggplot happy when working with rectangles
-  commonData_1 <- aes(x=calRatio$x, y=calRatio$y.values, color = calRatio$y.ind)
-  commonData_2 <- aes(x=dynamicR$x, y=dynamicR$y.values, color = dynamicR$y.ind)
+  commonData_1 <- aes(x=Condition.Times, y=X340.380.values, color = X340.380.ind)
+  commonData_2 <- aes(x=Condition.Times, y=X340.380.Dyn.values, color = X340.380.Dyn.ind)
   
   # 380 Plot
-  ggplot(data = cal380, aes(x=cal380$x, y=cal380$y.values, color = cal380$y.ind)) + 
+  ggplot(data = calDF, aes(x=Condition.Times, y=X380.values, color = X380.ind)) + 
     calPlot +
-    labs(x = "Time (min)", y = "", title = "380") + 
-    annotate("text", x=addTimes, y=max(cal380[2]), label = conds, size=10)
+    labs(title = "380") + 
+    annotate("text", x=addTimes, y=max(calDF$X380.values), label = conds, size=10)
   ggsave("380.pdf", device = "pdf", width = 16, height = 9, units = "in")
   
   # 340 Plot
-  ggplot(data = cal340, aes(x=cal340$x, y=cal340$y.values, color = cal340$y.ind)) +
+  ggplot(data = calDF, aes(x=Condition.Times, y=X340.values, color = X340.ind)) +
     calPlot + 
-    labs(x = "Time (min)", y = "", title = "340") + 
-    annotate("text", x=addTimes, y=max(cal340[2]), label = conds, size=10)
+    labs(title = "340") + 
+    annotate("text", x=addTimes, y=max(calDF$X340.values), label = conds, size=10)
   ggsave("340.pdf", device = "pdf", width = 16, height = 9, units = "in")
   
   # 340/380 Plot
-  ggplot(data = calRatio) + 
-    theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)) +
-    geom_point(commonData_1) +
-    geom_line(commonData_1) +
-    geom_vline(xintercept = (addTimes), color = "red") +
-    labs(x = "Time (min)", y = "", title = "340/380") + 
-    annotate("text", x=addTimes, y=max(calRatio[2]), label = conds, size=10)+
-    geom_rect(data = rects, aes(xmin = xstart, xmax = xend, ymin = -Inf, ymax = Inf), fill = "darkslategray4", alpha = .2)
+  ggplot(data = calDF) + 
+    calCommon +
+    geom_point(aes(x=Condition.Times, y=X340.380.values, color = X340.380.ind)) +
+    geom_line(aes(x=Condition.Times, y=X340.380.values, color = X340.380.ind)) +
+    labs(title = "340/380") + 
+    annotate("text", x=addTimes, y=max(calDF$X340.380.values), label = conds, size=10) +
+    geom_rect(data = rects, aes(xmin = xstart, xmax = xend, ymin = -Inf, ymax = Inf), fill = "steelblue4", alpha = .2)
   ggsave(paste("340\\380.pdf"), device = "pdf", width = 16, height = 9, units = "in")
   
   # 340/380 as % Dynamic Range Plot
-  ggplot(data = dynamicR) + 
-    theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)) +
+  ggplot(data = calDF) + 
+    calCommon +
     geom_point(commonData_2) +
     geom_line(commonData_2) +
-    geom_vline(xintercept = (addTimes), color = "red") +
-    labs(x = "Time (min)", y = "", title = "340/380 as % Dynamic Ratio") + 
-    annotate("text", x=addTimes, y=max(dynamicR[2]), label = conds, size=10) +
-    geom_rect(data = rects, aes(xmin = xstart, xmax = xend, ymin = -Inf, ymax = Inf), fill = "darkslategray4", alpha = .2)
+    labs(title = "340/380 as % Dynamic Ratio") + 
+    annotate("text", x=addTimes, y=max(calDF$X340.380.Dyn.values), label = conds, size=10) +
+    geom_rect(data = rects, aes(xmin = xstart, xmax = xend, ymin = -Inf, ymax = Inf), fill = "steelblue4", alpha = .2)
   ggsave(paste("340\\380 As %% Dynamic Ratio.pdf"), device = "pdf", width = 16, height = 9, units = "in")
 }

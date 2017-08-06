@@ -1,5 +1,5 @@
-readCalciumTester <- function(dateArg, ...) {
-  
+readCalcium <- function(dateArg, ...) {
+
   # Initiate Variables
   conds <- c(..., "Ionomycin")
   divergeStart <- divergeEnd <- c()
@@ -62,44 +62,35 @@ readCalciumTester <- function(dateArg, ...) {
   # Plots -----------------------------------------------------
   
   # Template Theme and Geoms
-  calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_vline(xintercept = (addTimes), color = "red", alpha = 0.5))
-  calPlot <- list(calCommon, geom_point(), geom_line())
-  
-  # To keep ggplot happy when working with rectangles
-  commonData_1 <- aes(x=Condition.Times, y=X340.380.values, color = X340.380.ind)
-  commonData_2 <- aes(x=Condition.Times, y=X340.380.Dyn.values, color = X340.380.Dyn.ind)
+  calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_vline(xintercept = (addTimes), color = "red", alpha = 0.5), geom_point(), geom_line())
   
   # 380 Plot
   ggplot(data = calDF, aes(x=Condition.Times, y=X380.values, color = X380.ind)) + 
-    calPlot +
+    calCommon +
     labs(title = "380") + 
     annotate("text", x=addTimes, y=max(calDF$X380.values), label = conds, size=10)
   ggsave("380.pdf", device = "pdf", width = 16, height = 9, units = "in")
   
   # 340 Plot
   ggplot(data = calDF, aes(x=Condition.Times, y=X340.values, color = X340.ind)) +
-    calPlot + 
+    calCommon + 
     labs(title = "340") + 
     annotate("text", x=addTimes, y=max(calDF$X340.values), label = conds, size=10)
   ggsave("340.pdf", device = "pdf", width = 16, height = 9, units = "in")
   
   # 340/380 Plot
-  ggplot(data = calDF) + 
+  ggplot(data = calDF, aes(x=Condition.Times, y=X340.380.values, color = X340.380.ind)) + 
     calCommon +
-    geom_point(aes(x=Condition.Times, y=X340.380.values, color = X340.380.ind)) +
-    geom_line(aes(x=Condition.Times, y=X340.380.values, color = X340.380.ind)) +
     labs(title = "340/380") + 
     annotate("text", x=addTimes, y=max(calDF$X340.380.values), label = conds, size=10) +
-    geom_rect(data = rects, aes(xmin = xstart, xmax = xend, ymin = -Inf, ymax = Inf), fill = "steelblue4", alpha = .2)
+    annotate("rect", xmin = rects$xstart, xmax = rects$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")
   ggsave(paste("340\\380.pdf"), device = "pdf", width = 16, height = 9, units = "in")
   
   # 340/380 as % Dynamic Range Plot
-  ggplot(data = calDF) + 
+  ggplot(data = calDF, aes(x=Condition.Times, y=X340.380.Dyn.values, color = X340.380.Dyn.ind)) + 
     calCommon +
-    geom_point(commonData_2) +
-    geom_line(commonData_2) +
     labs(title = "340/380 as % Dynamic Ratio") + 
     annotate("text", x=addTimes, y=max(calDF$X340.380.Dyn.values), label = conds, size=10) +
-    geom_rect(data = rects, aes(xmin = xstart, xmax = xend, ymin = -Inf, ymax = Inf), fill = "steelblue4", alpha = .2)
+    annotate("rect", xmin = rects$xstart, xmax = rects$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")
   ggsave(paste("340\\380 As %% Dynamic Ratio.pdf"), device = "pdf", width = 16, height = 9, units = "in")
 }

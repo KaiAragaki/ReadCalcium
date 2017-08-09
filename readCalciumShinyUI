@@ -7,7 +7,8 @@ shinyUI(fluidPage(
         tabPanel("340", plotOutput("X340Plot")),
         tabPanel("380", plotOutput("X380Plot")),
         tabPanel("340/380", plotOutput("X340380Plot")),
-        tabPanel("340/380 Dyn", plotOutput("X340380DynPlot"))
+        tabPanel("340/380 Dyn", plotOutput("X340380DynPlot")),
+        tabPanel("Data Table", tableOutput("calDFTable"))
       )
     ),
     sidebarPanel(

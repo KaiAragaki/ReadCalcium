@@ -1,17 +1,9 @@
 shinyServer(function(input, output) {
-# TODO:
-  # Add rect dynamics back
-  # Replace the unpacking portion with proper variable name callouts
-  
-# NOTES
-  # Maybe it'd be best to have the Initial Data Analysis done On File Upload, and leave the plot making after On Button Press
-  # I removed rectangles entirely for right now. I'm planning on updating the last two graphs upon each slider adjustment
-  # The On Submit is pulling from the on File Upload, and completely bypassing the on slider shift. 
-  
+
 require("tidyverse")
 require("dichromat")
   
-# Initial Data Analysis   
+# On File Upload  
   calData <- eventReactive(input$fileUpload,{
     calFile <- read.delim(input$fileUpload$datapath)
     calFile <- calFile[ ,-1]
@@ -53,115 +45,54 @@ require("dichromat")
     # Final Outputs----
     list(calDF, addTimes, conds, condTimesOld, condTimes)
     })
-  
-# On File Upload
-  myplots <- eventReactive(input$fileUpload,{
+
+# On Submit Click OR Slider Change
+  downloadPlots <- eventReactive({
+    input$submit
+    input$slpDvg
+    },{
+    # Assignments
     calDF <- calData()[[1]]
-    addTimes <- calData()[[2]]
-    conds <- calData()[[3]]
-    calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_point(), geom_line(), geom_vline(xintercept = addTimes))
-      
-    reactive380 <- ggplot(data = calDF, aes(x=Condition.Times, y=X380.values, color = X340.ind)) + 
-        calCommon +
-        labs(title = "380") + 
-        annotate("text", x=addTimes, y=max(calDF$X380.values), label = conds, size=10)
-      
-    reactive340 <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=X340.values, color = X340.ind)) + 
-        calCommon +
-        labs(title = "340") + 
-        annotate("text", x=addTimes, y=max(calDF$X340.values), label = conds, size=10)
-      
-    reactive340380 <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=X340380, color = X340.ind)) + 
-        calCommon +
-        labs(title = "340/380") + 
-        annotate("text", x=addTimes, y=max(calDF$X340380), label = conds, size=10)
-    if(length(rectangles()) != 0){reactive340380 <-  reactive340380 + annotate("rect", xmin = rectangles()$xstart, xmax = rectangles()$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")}
-    else{reactive340380}
-      
-    reactive340380Dyn <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=dynR, color = X340.ind)) + 
+    condTimes <- calData()[[5]]
+    calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_point(), geom_line(), geom_vline(xintercept = calData()[[2]]))
+    e <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=X340.values, color = X340.ind)) + 
+      calCommon +
+      labs(title = "340") + 
+      annotate("text", x=calData()[[2]], y=max(calDF$X340.values), label = calData()[[3]], size=10)
+    f <- ggplot(data = calDF, aes(x=Condition.Times, y=X380.values, color = X340.ind)) + 
+      calCommon +
+      labs(title = "380") + 
+      annotate("text", x=calData()[[2]], y=max(calDF$X380.values), label = calData()[[3]], size=10)
+    g <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=X340380, color = X340.ind)) + 
+      calCommon +
+      labs(title = "340/380") + 
+      annotate("text", x=calData()[[2]], y=max(calDF$X340380), label = calData()[[3]], size=10)
+    h <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=dynR, color = X340.ind)) + 
       calCommon +
       labs(title = "340/380 as % Dynamic Ratio") + 
-      annotate("text", x=addTimes, y=max(calDF$dynR), label = conds, size=10)
-    if(length(rectangles()) != 0){reactive340380Dyn <-  reactive340380Dyn + annotate("rect", xmin = rectangles()$xstart, xmax = rectangles()$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")}
-    else{reactive340380Dyn}
-
-    list(reactive340, reactive380, reactive340380, reactive340380Dyn)
-  })
-
-# On Slider Shift
-  rectangles <- eventReactive(input$slpDvgSensitivity,{
-    
-    # Unpacking Data----
-    calDF <- calData()[[1]]
-    condTimesOld <- calData()[[4]]
-    condTimes <- calData()[[5]]
-    slpDvg<- input$slpDvgSensitivity
-    
-    # Initiating Variables----
+      annotate("text", x=calData()[[2]], y=max(calDF$dynR), label = calData()[[3]], size=10)
     divergeStart <- divergeEnd <- c()
-    
-    for (i in 1:(length(condTimesOld)-1)){
-      if(calDF$mean380[i] - calDF$mean380[i+1] > slpDvg & calDF$mean340[i + 1] - calDF$mean340[i] > slpDvg | calDF$mean380[i+1] - calDF$mean380[i] > slpDvg & calDF$mean340[i] - calDF$mean340[i + 1] > slpDvg){
+    # Calculations
+    for (i in 1:(length(calData()[[4]])-1)){
+      if(calDF$mean380[i] - calDF$mean380[i+1] > input$slpDvg & calDF$mean340[i + 1] - calDF$mean340[i] > input$slpDvg | calDF$mean380[i+1] - calDF$mean380[i] > input$slpDvg & calDF$mean340[i] - calDF$mean340[i + 1] > input$slpDvg){
         divergeStart <- c(divergeStart, condTimes[i])
         divergeEnd <- c(divergeEnd, condTimes[i+1])
       }
     }
     rectangles <- data.frame(xstart = divergeStart, xend = divergeEnd)
-  })
-  
-  sliderReact <- eventReactive(input$slpDvgSensitivity, {
-    calDF <- calData()[[1]]
-    addTimes <- calData()[[2]]
-    conds <- calData()[[3]]
-    calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_point(), geom_line(), geom_vline(xintercept = addTimes))
     
-    reactive340380 <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=X340380, color = X340.ind)) + 
-      calCommon +
-      labs(title = "340/380") + 
-      annotate("text", x=addTimes, y=max(calDF$X340380), label = conds, size=10)
-    if(length(rectangles()) != 0){reactive340380 <-  reactive340380 + annotate("rect", xmin = rectangles()$xstart, xmax = rectangles()$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")}
-    else{reactive340380}
-    
-    reactive340380Dyn <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=dynR, color = X340.ind)) + 
-      calCommon +
-      labs(title = "340/380 as % Dynamic Ratio") + 
-      annotate("text", x=addTimes, y=max(calDF$dynR), label = conds, size=10)
-    if(length(rectangles()) != 0){reactive340380Dyn <-  reactive340380Dyn + annotate("rect", xmin = rectangles()$xstart, xmax = rectangles()$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")}
-    else{reactive340380Dyn}
-    
-    output$X340380Plot <- renderPlot({
-      reactive340380
-    })
-    output$X340380DynPlot <- renderPlot({
-      reactive340380Dyn
-    })
-    list(reactive340380, reactive340380Dyn)
+    if(length(rectangles) != 0){g <-  g + annotate("rect", xmin = rectangles$xstart, xmax = rectangles$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")}
+    if(length(rectangles) != 0){h <-  h + annotate("rect", xmin = rectangles$xstart, xmax = rectangles$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")}
+    list(e, f, g, h)
   })
-  
-  observeEvent(input$slpDvgSensitivity, {
-    output$X340380Plot <- renderPlot({
-      sliderReact()[[1]]
-    })
-    output$X340380DynPlot <- renderPlot({
-      sliderReact()[[2]]
-    })
-  })
-  
-# On Submit Click
-  observeEvent(input$submit,{
-    # Plots
-    output$X340Plot <- renderPlot({
-      myplots()[1]
-    })
-    output$X380Plot <- renderPlot({
-      myplots()[2]
-    })
-    output$X340380Plot <- renderPlot({
-      sliderReact()[[1]]
-    })
-    output$X340380DynPlot <- renderPlot({
-      sliderReact()[[2]]
-    })
+  observeEvent({
+    input$submit
+    input$slpDvg
+  },{
+    output$X340Plot <- renderPlot({downloadPlots()[[1]]})
+    output$X380Plot <- renderPlot({downloadPlots()[[2]]})
+    output$X340380Plot <- renderPlot({downloadPlots()[[3]]})
+    output$X340380DynPlot <- renderPlot({downloadPlots()[[4]]})
     # Table
     output$calDFTable <- renderTable(as.data.frame(calData()[[1]]))
   })
@@ -170,25 +101,25 @@ require("dichromat")
   output$downloadData1 = downloadHandler(
     filename = "340.pdf",
     content = function(file) { 
-      ggsave(file, plot = myplots()[[1]], device = "pdf", width = 16, height = 9, units = "in")
+      ggsave(file, plot = downloadPlots()[[1]], device = "pdf", width = 16, height = 9, units = "in")
     }
   )
   output$downloadData2 = downloadHandler(
     filename = "380.pdf",
     content = function(file) { 
-      ggsave(file, plot = myplots()[[2]], device = "pdf", width = 16, height = 9, units = "in")
+      ggsave(file, plot = downloadPlots()[[2]], device = "pdf", width = 16, height = 9, units = "in")
     }
   )
   output$downloadData3 = downloadHandler(
     filename = "340\\380.pdf",
     content = function(file) { 
-      ggsave(file, plot = sliderReact()[[1]], device = "pdf", width = 16, height = 9, units = "in")
+      ggsave(file, plot = downloadPlots()[[3]], device = "pdf", width = 16, height = 9, units = "in")
     }
   )
   output$downloadData4 = downloadHandler(
     filename = "340\\380Dyn.pdf",
     content = function(file) { 
-      ggsave(file, plot = sliderReact()[[2]], device = "pdf", width = 16, height = 9, units = "in")
+      ggsave(file, plot = downloadPlots()[[4]], device = "pdf", width = 16, height = 9, units = "in")
     }
   )
   

@@ -1,0 +1,21 @@
+shinyUI(fluidPage(
+  titlePanel("Calcium Reader"),
+  
+  sidebarLayout(
+    mainPanel(
+      tabsetPanel(
+        tabPanel("340", plotOutput("X340Plot"), downloadButton("downloadData1", label = "Download 340")),
+        tabPanel("380", plotOutput("X380Plot"), downloadButton("downloadData2", label = "Download 380")),
+        tabPanel("340/380", plotOutput("X340380Plot"), downloadButton("downloadData3", label = "Download 340/380")),
+        tabPanel("340/380 Dyn", plotOutput("X340380DynPlot"), downloadButton("downloadData4", label = "Download 340/380 Dyn")),
+        tabPanel("Data Table", tableOutput("calDFTable"))
+      )
+    ),
+    sidebarPanel(
+  textInput("conditionNames", label = "Condition Names", placeholder = "Condition 1, Condition 2, ..."),
+  fileInput("fileUpload", label = "Upload File"),
+  sliderInput("slpDvgSensitivity", label = "Sensitivity of slope-divergence highlighter", min = 0, max = 100, value = 25),
+  actionButton("submit", label = "Submit")
+    )
+  )
+))

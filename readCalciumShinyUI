@@ -12,10 +12,10 @@ shinyUI(fluidPage(
       )
     ),
     sidebarPanel(
-  textInput("conditionNames", label = "Condition Names", placeholder = "Condition 1, Condition 2, ..."),
-  fileInput("fileUpload", label = "Upload File"),
-  sliderInput("slpDvgSensitivity", label = "Sensitivity of slope-divergence highlighter", min = 0, max = 100, value = 25),
-  actionButton("submit", label = "Submit")
+      textInput("conditionNames", label = "Condition Names", placeholder = "Condition 1, Condition 2, ..."),
+      fileInput("fileUpload", label = "Upload File"),
+      sliderInput("slpDvg", label = "Sensitivity of slope-divergence highlighter", min = 0, max = 100, value = 25),
+      actionButton("submit", label = "Submit")
     )
   )
 ))

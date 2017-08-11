@@ -1,89 +1,128 @@
 shinyServer(function(input, output) {
-
-require("tidyverse")
-require("dichromat")
   
-# On File Upload  
+  require("tidyverse")
+  require("dichromat")
+  
+  # On File Upload  
   calData <- eventReactive(input$fileUpload,{
+    
+    # Takes in the file and extracts the raw 340 and 380, to use in signal/noise visualization ----
     calFile <- read.delim(input$fileUpload$datapath)
     calFile <- calFile[ ,-1]
     
-    # Initiate Variables----
+    noBG <- calFile[, -1]
+    
+    raw380 <- rowMeans(noBG[seq(2, nrow(noBG), 2),])
+    bg380 <- calFile[seq(2, nrow(calFile), 2), 1]
+    
+    raw340 <- rowMeans(noBG[seq(1, nrow(noBG), 2),])
+    bg340 <- calFile[seq(1, nrow(calFile), 2), 1]
+    
+    
+    # Initialize Variables ----
     input <- unlist(strsplit(input$conditionNames, ","))
     conds <- c(input, "Ionomycin")
     
-    # Sets baseline and standard cond time intervals----
+    # Sets baseline and standard cond time intervals ----
     interval <- c(0:4)
     condInterval <- c(.5, 1, 2, 3, 5)
     addTimes <- c(4) 
     
-    # Loops for each cond and appends the time - not including Ionomycin time, which has its own interval.----
+    # Loops for each cond and appends the time - not including Ionomycin time, which has its own interval. ----
     for (i in 1:(length(conds) - 1)){
       addtlCond <- condInterval + last(interval)
       interval <- c(interval, addtlCond)
       addTimes <- c(addTimes, last(interval))
     }
     
-    # Tacks on ionomycin time----
+    # Tacks on ionomycin time ----
     ionomycinInterval <- last(interval) + c(.5, 1, 2, 3)
     condTimes <- c(interval, ionomycinInterval)
-
-    # Subtracts background from each cell----
+    
+    # Subtracts background from each cell, separates them into nice, managable variables ----
     minusBG <- mutate_all(calFile, function(x) {x - calFile[ ,1]})
     minusBG <- minusBG[ ,-1]
     condTimesOld <- condTimes
     condTimes <- rep(condTimes, ncol(minusBG))
     
-    # Slices and dices, with math----
-    calDF <- data.frame("Condition Times" = condTimes, "380" = stack(minusBG[seq(2, nrow(minusBG), 2),]), "340" = stack(cal340 <- minusBG[seq(1, nrow(minusBG), 2),])) %>%
-      mutate("X340380" = X340.values/X380.values) %>%
-      group_by(X380.ind) %>%
-      mutate("Baseline" = mean(X340380[1:5]), "maxIono" = max(tail(X340380)), "dynR" = (X340380-Baseline)/(maxIono-Baseline) * 100) %>%
-      group_by(Condition.Times) %>%
-      mutate("mean380" = mean(X380.values), "mean340" = mean(X340.values))
+    values380 <- stack(minusBG[seq(2, nrow(minusBG), 2),])[, -2]
+    values340 <- stack(cal340 <- minusBG[seq(1, nrow(minusBG), 2),])[, -2]
+    cellNames <- stack(minusBG[seq(2, nrow(minusBG), 2),])[, -1]
+    
+    # Making the calDF tibble, with math ----
+    calDF <- tibble("Condition Times" = condTimes, "380" = values380, "340" = values340, "Cell" = cellNames) %>%
+      mutate("340/380" = `340`/`380`) %>%
+      group_by(Cell) %>%
+      mutate("Baseline" = mean(`340/380`[1:5]), "maxIono" = max(tail(`340/380`)), "dynR" = (`340/380`-Baseline)/(maxIono-Baseline) * 100) %>%
+      group_by(`Condition Times`) %>%
+      mutate("mean380" = mean(`380`), "mean340" = mean(`340`))
+    
+    # Making signal to noise tibble ----
+    rawCal <- tibble("Condition Times" = condTimesOld,"Raw 380" = raw380, "Raw 340" = raw340, "380 Background" =  bg380, "340 Background" = bg340)
     
     # Final Outputs----
-    list(calDF, addTimes, conds, condTimesOld, condTimes)
-    })
-
-# On Submit Click OR Slider Change
+    list(calDF, addTimes, conds, condTimesOld, condTimes, rawCal)
+  })
+  
+  # On Submit Click OR Slider Change
   downloadPlots <- eventReactive({
     input$submit
     input$slpDvg
-    },{
-    # Assignments
+  },{
+    
+    # Assignments ----
     calDF <- calData()[[1]]
     condTimes <- calData()[[5]]
+    rawCal <- calData()[[6]]
+    
+    # Making the graphs ----
     calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_point(), geom_line(), geom_vline(xintercept = calData()[[2]]))
-    e <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=X340.values, color = X340.ind)) + 
+
+    e <- ggplot(data = calDF, aes(x =`Condition Times`, y = `340`, color = `Cell`)) + 
       calCommon +
       labs(title = "340") + 
-      annotate("text", x=calData()[[2]], y=max(calDF$X340.values), label = calData()[[3]], size=10)
-    f <- ggplot(data = calDF, aes(x=Condition.Times, y=X380.values, color = X340.ind)) + 
+      annotate("text", x = calData()[[2]], y = max(calDF$`340`), label = calData()[[3]], size = 10)
+    
+    f <- ggplot(data = calDF, aes(x = `Condition Times`, y = `380`, color = Cell)) + 
       calCommon +
       labs(title = "380") + 
-      annotate("text", x=calData()[[2]], y=max(calDF$X380.values), label = calData()[[3]], size=10)
-    g <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=X340380, color = X340.ind)) + 
+      annotate("text", x = calData()[[2]], y = max(calDF$`380`), label = calData()[[3]], size = 10)
+    
+    g <- ggplot(data = calDF, aes(x = `Condition Times`, y = `340/380`, color = Cell)) + 
       calCommon +
       labs(title = "340/380") + 
-      annotate("text", x=calData()[[2]], y=max(calDF$X340380), label = calData()[[3]], size=10)
-    h <- ggplot(data = as.data.frame(calData()[1]), aes(x=Condition.Times, y=dynR, color = X340.ind)) + 
+      annotate("text", x = calData()[[2]], y = max(calDF$`340/380`), label = calData()[[3]], size = 10)
+    
+    h <- ggplot(data = calDF, aes(x = `Condition Times`, y = dynR, color = Cell)) + 
       calCommon +
       labs(title = "340/380 as % Dynamic Ratio") + 
-      annotate("text", x=calData()[[2]], y=max(calDF$dynR), label = calData()[[3]], size=10)
+      annotate("text", x = calData()[[2]], y = max(calDF$dynR), label = calData()[[3]], size = 10)
+    
+    j <- ggplot(data = rawCal, aes(x = `Condition Times`)) +
+      geom_ribbon(aes(ymin = `340 Background`, ymax = `Raw 340`), color = "skyblue4", fill = "skyblue", alpha = .9) +
+      geom_ribbon(aes(ymin = `380 Background`, ymax = `Raw 380`), color = "tomato4", fill = "tomato", alpha = .5) + 
+      labs(x = "Time (min)", y = "", title = "Signal to Noise")
+    
     divergeStart <- divergeEnd <- c()
-    # Calculations
+    
+    # Check for above-threshold slope divergence ----
     for (i in 1:(length(calData()[[4]])-1)){
       if(calDF$mean380[i] - calDF$mean380[i+1] > input$slpDvg & calDF$mean340[i + 1] - calDF$mean340[i] > input$slpDvg | calDF$mean380[i+1] - calDF$mean380[i] > input$slpDvg & calDF$mean340[i] - calDF$mean340[i + 1] > input$slpDvg){
         divergeStart <- c(divergeStart, condTimes[i])
         divergeEnd <- c(divergeEnd, condTimes[i+1])
       }
     }
+    
     rectangles <- data.frame(xstart = divergeStart, xend = divergeEnd)
     
-    if(length(rectangles) != 0){g <-  g + annotate("rect", xmin = rectangles$xstart, xmax = rectangles$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")}
-    if(length(rectangles) != 0){h <-  h + annotate("rect", xmin = rectangles$xstart, xmax = rectangles$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")}
-    list(e, f, g, h)
+    # If there is any, add it to the graphs ----
+    if(length(rectangles) != 0){
+      g <-  g + annotate("rect", xmin = rectangles$xstart, xmax = rectangles$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")
+      h <-  h + annotate("rect", xmin = rectangles$xstart, xmax = rectangles$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")
+    }
+    
+    # Final Output ----
+    list(e, f, g, h, j)
   })
   observeEvent({
     input$submit
@@ -93,11 +132,12 @@ require("dichromat")
     output$X380Plot <- renderPlot({downloadPlots()[[2]]})
     output$X340380Plot <- renderPlot({downloadPlots()[[3]]})
     output$X340380DynPlot <- renderPlot({downloadPlots()[[4]]})
+    output$SignalToNoise <- renderPlot({downloadPlots()[[5]]})
     # Table
     output$calDFTable <- renderTable(as.data.frame(calData()[[1]]))
   })
   
-# On Download Click----
+  # On Download Click----
   output$downloadData1 = downloadHandler(
     filename = "340.pdf",
     content = function(file) { 
@@ -120,6 +160,12 @@ require("dichromat")
     filename = "340\\380Dyn.pdf",
     content = function(file) { 
       ggsave(file, plot = downloadPlots()[[4]], device = "pdf", width = 16, height = 9, units = "in")
+    }
+  )
+  output$downloadData5 = downloadHandler(
+    filename = "Signal to Noise.pdf",
+    content = function(file) { 
+      ggsave(file, plot = downloadPlots()[[5]], device = "pdf", width = 16, height = 9, units = "in")
     }
   )
   

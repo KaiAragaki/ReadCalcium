@@ -23,7 +23,7 @@
 - dichromat
 
 ## Description
-- Takes an XLS file (which in actuality is a tab delimited text file with an .xls extension), subtracts background, then stores all data required in a couple tibbles
+- Takes a .csv, subtracts background, then stores all data required in a couple tibbles
 - Generates 5 graphs, as denoted by the tabs, which can be downloaded.
 - About as stable as a house of cards in a tornado
 

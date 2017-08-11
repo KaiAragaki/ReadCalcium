@@ -7,9 +7,16 @@ shinyServer(function(input, output) {
   calData <- eventReactive(input$fileUpload,{
     
     # Takes in the file and extracts the raw 340 and 380, to use in signal/noise visualization ----
-    calFile <- read.delim(input$fileUpload$datapath)
-    calFile <- calFile[ ,-1]
+    # Test if tsv or csv
+    testDelim <-  read_lines(input$fileUpload$datapath)
+    if (grepl(",", testDelim)) {
+     calFile <- read.csv(input$fileUpload$datapath)
+    }
+    else {
+      calFile <-  read.delim(input$fileUpload$datapath)
+    }
     
+    calFile <- calFile[ ,-1]
     noBG <- calFile[, -1]
     
     raw380 <- rowMeans(noBG[seq(2, nrow(noBG), 2),])

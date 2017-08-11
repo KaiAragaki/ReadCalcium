@@ -3,7 +3,7 @@ shinyServer(function(input, output) {
   require("tidyverse")
   require("dichromat")
   
-  # On File Upload  
+  # On File Upload ---- 
   calData <- eventReactive(input$fileUpload,{
     
     # Takes in the file and extracts the raw 340 and 380, to use in signal/noise visualization ----
@@ -24,19 +24,14 @@ shinyServer(function(input, output) {
     
     raw340 <- rowMeans(noBG[seq(1, nrow(noBG), 2),])
     bg340 <- calFile[seq(1, nrow(calFile), 2), 1]
-    
-    
-    # Initialize Variables ----
-    input <- unlist(strsplit(input$conditionNames, ","))
-    conds <- c(input, "Ionomycin")
-    
+ 
     # Sets baseline and standard cond time intervals ----
     interval <- c(0:4)
     condInterval <- c(.5, 1, 2, 3, 5)
     addTimes <- c(4) 
     
     # Loops for each cond and appends the time - not including Ionomycin time, which has its own interval. ----
-    for (i in 1:(length(conds) - 1)){
+    for (i in 1:((nrow(calFile) - 18)/10)){
       addtlCond <- condInterval + last(interval)
       interval <- c(interval, addtlCond)
       addTimes <- c(addTimes, last(interval))
@@ -68,19 +63,30 @@ shinyServer(function(input, output) {
     rawCal <- tibble("Condition Times" = condTimesOld,"Raw 380" = raw380, "Raw 340" = raw340, "380 Background" =  bg380, "340 Background" = bg340)
     
     # Final Outputs----
-    list(calDF, addTimes, conds, condTimesOld, condTimes, rawCal)
+    list(calDF, addTimes, condTimesOld, condTimes, rawCal)
   })
   
-  # On Submit Click OR Slider Change
+  # On File Upload OR Text input
+  conds <- eventReactive({
+    input$fileUpload
+    input$conditionNames
+    },{
+      input <- unlist(strsplit(input$conditionNames, ","))
+      conds <- c(input, "Ionomycin")
+    })
+  
+  # On Submit Click OR Slider Change OR Text Change
   downloadPlots <- eventReactive({
     input$submit
     input$slpDvg
+    input$conditionNames
   },{
     
     # Assignments ----
     calDF <- calData()[[1]]
-    condTimes <- calData()[[5]]
-    rawCal <- calData()[[6]]
+    condTimes <- calData()[[4]]
+    rawCal <- calData()[[5]]
+    
     
     # Making the graphs ----
     calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_point(), geom_line(), geom_vline(xintercept = calData()[[2]]))
@@ -88,24 +94,25 @@ shinyServer(function(input, output) {
     e <- ggplot(data = calDF, aes(x =`Condition Times`, y = `340`, color = `Cell`)) + 
       calCommon +
       labs(title = "340") + 
-      annotate("text", x = calData()[[2]], y = max(calDF$`340`), label = calData()[[3]], size = 10)
+      annotate("text", x = calData()[[2]], y = max(calDF$`340`), label = conds(), size = 10)
     
     f <- ggplot(data = calDF, aes(x = `Condition Times`, y = `380`, color = Cell)) + 
       calCommon +
       labs(title = "380") + 
-      annotate("text", x = calData()[[2]], y = max(calDF$`380`), label = calData()[[3]], size = 10)
+      annotate("text", x = calData()[[2]], y = max(calDF$`380`), label = conds(), size = 10)
     
     g <- ggplot(data = calDF, aes(x = `Condition Times`, y = `340/380`, color = Cell)) + 
       calCommon +
       labs(title = "340/380") + 
-      annotate("text", x = calData()[[2]], y = max(calDF$`340/380`), label = calData()[[3]], size = 10)
+      annotate("text", x = calData()[[2]], y = max(calDF$`340/380`), label = conds(), size = 10)
     
     h <- ggplot(data = calDF, aes(x = `Condition Times`, y = dynR, color = Cell)) + 
       calCommon +
       labs(title = "340/380 as % Dynamic Ratio") + 
-      annotate("text", x = calData()[[2]], y = max(calDF$dynR), label = calData()[[3]], size = 10)
+      annotate("text", x = calData()[[2]], y = max(calDF$dynR), label = conds(), size = 10)
     
     j <- ggplot(data = rawCal, aes(x = `Condition Times`)) +
+      theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)) +
       geom_ribbon(aes(ymin = `340 Background`, ymax = `Raw 340`), color = "skyblue4", fill = "skyblue", alpha = .9) +
       geom_ribbon(aes(ymin = `380 Background`, ymax = `Raw 380`), color = "tomato4", fill = "tomato", alpha = .5) + 
       labs(x = "Time (min)", y = "", title = "Signal to Noise")
@@ -113,7 +120,7 @@ shinyServer(function(input, output) {
     divergeStart <- divergeEnd <- c()
     
     # Check for above-threshold slope divergence ----
-    for (i in 1:(length(calData()[[4]])-1)){
+    for (i in 1:(length(calData()[[3]])-1)){
       if(calDF$mean380[i] - calDF$mean380[i+1] > input$slpDvg & calDF$mean340[i + 1] - calDF$mean340[i] > input$slpDvg | calDF$mean380[i+1] - calDF$mean380[i] > input$slpDvg & calDF$mean340[i] - calDF$mean340[i + 1] > input$slpDvg){
         divergeStart <- c(divergeStart, condTimes[i])
         divergeEnd <- c(divergeEnd, condTimes[i+1])

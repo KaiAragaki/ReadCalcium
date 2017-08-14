@@ -1,13 +1,15 @@
 shinyServer(function(input, output) {
-  
+  #TODO:
+  # Maybe I can keep rawcal in the calDF
+
   require("tidyverse")
   require("dichromat")
   
-  # On File Upload ---- 
+  # On File Upload ----------------------------------------------------------- 
   calData <- eventReactive(input$fileUpload,{
     
     # Takes in the file and extracts the raw 340 and 380, to use in signal/noise visualization ----
-    # Test if tsv or csv
+    # Test if tsv or csv (yes, I'd love to use readr, but tibbles don't recycle)
     testDelim <-  read_lines(input$fileUpload$datapath)
     if (grepl(",", testDelim)) {
      calFile <- read.csv(input$fileUpload$datapath)
@@ -15,42 +17,33 @@ shinyServer(function(input, output) {
     else {
       calFile <-  read.delim(input$fileUpload$datapath)
     }
-    
     calFile <- calFile[ ,-1]
     noBG <- calFile[, -1]
-    
     raw380 <- rowMeans(noBG[seq(2, nrow(noBG), 2),])
     bg380 <- calFile[seq(2, nrow(calFile), 2), 1]
-    
     raw340 <- rowMeans(noBG[seq(1, nrow(noBG), 2),])
     bg340 <- calFile[seq(1, nrow(calFile), 2), 1]
- 
     # Sets baseline and standard cond time intervals ----
     interval <- c(0:4)
     condInterval <- c(.5, 1, 2, 3, 5)
     addTimes <- c(4) 
-    
     # Loops for each cond and appends the time - not including Ionomycin time, which has its own interval. ----
+    # 18 = Number of snapshots in baseline & ionomycin, 10 = number of snapshots per condition.
     for (i in 1:((nrow(calFile) - 18)/10)){
       addtlCond <- condInterval + last(interval)
       interval <- c(interval, addtlCond)
       addTimes <- c(addTimes, last(interval))
     }
-    
     # Tacks on ionomycin time ----
     ionomycinInterval <- last(interval) + c(.5, 1, 2, 3)
     condTimes <- c(interval, ionomycinInterval)
-    
     # Subtracts background from each cell, separates them into nice, managable variables ----
-    minusBG <- mutate_all(calFile, function(x) {x - calFile[ ,1]})
-    minusBG <- minusBG[ ,-1]
+    minusBG <- calFile[2:ncol(calFile)] - calFile[,1]
     condTimesOld <- condTimes
     condTimes <- rep(condTimes, ncol(minusBG))
-    
     values380 <- stack(minusBG[seq(2, nrow(minusBG), 2),])[, -2]
     values340 <- stack(cal340 <- minusBG[seq(1, nrow(minusBG), 2),])[, -2]
     cellNames <- stack(minusBG[seq(2, nrow(minusBG), 2),])[, -1]
-    
     # Making the calDF tibble, with math ----
     calDF <- tibble("Condition Times" = condTimes, "380" = values380, "340" = values340, "Cell" = cellNames) %>%
       mutate("340/380" = `340`/`380`) %>%
@@ -66,7 +59,7 @@ shinyServer(function(input, output) {
     list(calDF, addTimes, condTimesOld, condTimes, rawCal)
   })
   
-  # On File Upload OR Text input
+  # On File Upload OR Text input ---------------------------------------------
   conds <- eventReactive({
     input$fileUpload
     input$conditionNames
@@ -75,41 +68,33 @@ shinyServer(function(input, output) {
       conds <- c(input, "Ionomycin")
     })
   
-  # On Submit Click OR Slider Change OR Text Change
-  downloadPlots <- eventReactive({
+  # On Submit Click OR Slider Change OR Text Change --------------------------
+  plots <- eventReactive({
     input$submit
     input$slpDvg
     input$conditionNames
   },{
     
-    # Assignments ----
+    # Assignments ------------------------------------------------------------
     calDF <- calData()[[1]]
     condTimes <- calData()[[4]]
     rawCal <- calData()[[5]]
     
     
-    # Making the graphs ----
+    # Making the graphs ------------------------------------------------------
     calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_point(), geom_line(), geom_vline(xintercept = calData()[[2]]))
-
-    e <- ggplot(data = calDF, aes(x =`Condition Times`, y = `340`, color = `Cell`)) + 
-      calCommon +
-      labs(title = "340") + 
-      annotate("text", x = calData()[[2]], y = max(calDF$`340`), label = conds(), size = 10)
-    
-    f <- ggplot(data = calDF, aes(x = `Condition Times`, y = `380`, color = Cell)) + 
-      calCommon +
-      labs(title = "380") + 
-      annotate("text", x = calData()[[2]], y = max(calDF$`380`), label = conds(), size = 10)
-    
-    g <- ggplot(data = calDF, aes(x = `Condition Times`, y = `340/380`, color = Cell)) + 
-      calCommon +
-      labs(title = "340/380") + 
-      annotate("text", x = calData()[[2]], y = max(calDF$`340/380`), label = conds(), size = 10)
-    
-    h <- ggplot(data = calDF, aes(x = `Condition Times`, y = dynR, color = Cell)) + 
-      calCommon +
-      labs(title = "340/380 as % Dynamic Ratio") + 
-      annotate("text", x = calData()[[2]], y = max(calDF$dynR), label = conds(), size = 10)
+    # Make function
+    graphCreate <- function(yValues, titleName){
+      ggplot(data = calDF, aes(x =`Condition Times`, y = yValues, color = `Cell`)) +
+        calCommon +
+        labs(title = titleName) +
+        annotate("text", x = calData()[[2]], y = max(yValues), label = conds(), size = 10)
+    }
+    # Call
+    e <- graphCreate(calDF$`340`, "340")
+    f <- graphCreate(calDF$`380`, "380")
+    g <- graphCreate(calDF$`340/380`, "340/380")
+    h <- graphCreate(calDF$`dynR`, "340/380 as % Dynamic Ratio")
     
     j <- ggplot(data = rawCal, aes(x = `Condition Times`)) +
       theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)) +
@@ -141,46 +126,28 @@ shinyServer(function(input, output) {
   observeEvent({
     input$submit
     input$slpDvg
+    input$conditionNames
   },{
-    output$X340Plot <- renderPlot({downloadPlots()[[1]]})
-    output$X380Plot <- renderPlot({downloadPlots()[[2]]})
-    output$X340380Plot <- renderPlot({downloadPlots()[[3]]})
-    output$X340380DynPlot <- renderPlot({downloadPlots()[[4]]})
-    output$SignalToNoise <- renderPlot({downloadPlots()[[5]]})
-    # Table
+    output$X340Plot <- renderPlot({plots()[[1]]})
+    output$X380Plot <- renderPlot({plots()[[2]]})
+    output$X340380Plot <- renderPlot({plots()[[3]]})
+    output$X340380DynPlot <- renderPlot({plots()[[4]]})
+    output$SignalToNoise <- renderPlot({plots()[[5]]})
     output$calDFTable <- renderTable(as.data.frame(calData()[[1]]))
+    # Make function
+    graphOutput <- function(name, inputname){
+      downloadHandler(
+        filename = paste0(name, ".pdf"),
+        content = function(file) {
+          ggsave(file, plot = inputname, device = "pdf", width = 16, height = 9, units = "in")
+        }
+      )
+    }
+    # Call  
+    output$downloadData1 <- graphOutput("340", plots()[[1]])
+    output$downloadData2 <- graphOutput("380", plots()[[2]])
+    output$downloadData3 <- graphOutput("340\\380", plots()[[3]])
+    output$downloadData4 <- graphOutput("340\\380Dyn", plots()[[4]])
+    output$downloadData5 <- graphOutput("Signal to Noise", plots()[[5]])
   })
-  
-  # On Download Click----
-  output$downloadData1 = downloadHandler(
-    filename = "340.pdf",
-    content = function(file) { 
-      ggsave(file, plot = downloadPlots()[[1]], device = "pdf", width = 16, height = 9, units = "in")
-    }
-  )
-  output$downloadData2 = downloadHandler(
-    filename = "380.pdf",
-    content = function(file) { 
-      ggsave(file, plot = downloadPlots()[[2]], device = "pdf", width = 16, height = 9, units = "in")
-    }
-  )
-  output$downloadData3 = downloadHandler(
-    filename = "340\\380.pdf",
-    content = function(file) { 
-      ggsave(file, plot = downloadPlots()[[3]], device = "pdf", width = 16, height = 9, units = "in")
-    }
-  )
-  output$downloadData4 = downloadHandler(
-    filename = "340\\380Dyn.pdf",
-    content = function(file) { 
-      ggsave(file, plot = downloadPlots()[[4]], device = "pdf", width = 16, height = 9, units = "in")
-    }
-  )
-  output$downloadData5 = downloadHandler(
-    filename = "Signal to Noise.pdf",
-    content = function(file) { 
-      ggsave(file, plot = downloadPlots()[[5]], device = "pdf", width = 16, height = 9, units = "in")
-    }
-  )
-  
 })

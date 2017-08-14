@@ -1,7 +1,6 @@
 shinyServer(function(input, output) {
   #TODO:
   # Maybe I can keep rawcal in the calDF
-
   require("tidyverse")
   require("dichromat")
   
@@ -27,7 +26,7 @@ shinyServer(function(input, output) {
     interval <- c(0:4)
     condInterval <- c(.5, 1, 2, 3, 5)
     addTimes <- c(4) 
-    # Loops for each cond and appends the time - not including Ionomycin time, which has its own interval. ----
+    # Loops for each cond and appends the time ----
     # 18 = Number of snapshots in baseline & ionomycin, 10 = number of snapshots per condition.
     for (i in 1:((nrow(calFile) - 18)/10)){
       addtlCond <- condInterval + last(interval)
@@ -37,7 +36,7 @@ shinyServer(function(input, output) {
     # Tacks on ionomycin time ----
     ionomycinInterval <- last(interval) + c(.5, 1, 2, 3)
     condTimes <- c(interval, ionomycinInterval)
-    # Subtracts background from each cell, separates them into nice, managable variables ----
+    # Subtracts bg from cell, separates into variables ----
     minusBG <- calFile[2:ncol(calFile)] - calFile[,1]
     condTimesOld <- condTimes
     condTimes <- rep(condTimes, ncol(minusBG))
@@ -59,7 +58,7 @@ shinyServer(function(input, output) {
     list(calDF, addTimes, condTimesOld, condTimes, rawCal)
   })
   
-  # On File Upload OR Text input ---------------------------------------------
+  # Update conds on file upload/text input ---------------------------------------------
   conds <- eventReactive({
     input$fileUpload
     input$conditionNames
@@ -68,7 +67,7 @@ shinyServer(function(input, output) {
       conds <- c(input, "Ionomycin")
     })
   
-  # On Submit Click OR Slider Change OR Text Change --------------------------
+  # Update plots on submit/slider change/text input --------------------------
   plots <- eventReactive({
     input$submit
     input$slpDvg
@@ -79,7 +78,6 @@ shinyServer(function(input, output) {
     calDF <- calData()[[1]]
     condTimes <- calData()[[4]]
     rawCal <- calData()[[5]]
-    
     
     # Making the graphs ------------------------------------------------------
     calCommon <- list(theme(plot.title = element_text(hjust = 0.5), legend.position ="none", text = element_text(size = 20)), labs(x = "Time (min)", y = ""), geom_point(), geom_line(), geom_vline(xintercept = calData()[[2]]))
@@ -104,7 +102,7 @@ shinyServer(function(input, output) {
     
     divergeStart <- divergeEnd <- c()
     
-    # Check for above-threshold slope divergence ----
+    # Check for above-threshold slope divergence -----------------------------
     for (i in 1:(length(calData()[[3]])-1)){
       if(calDF$mean380[i] - calDF$mean380[i+1] > input$slpDvg & calDF$mean340[i + 1] - calDF$mean340[i] > input$slpDvg | calDF$mean380[i+1] - calDF$mean380[i] > input$slpDvg & calDF$mean340[i] - calDF$mean340[i + 1] > input$slpDvg){
         divergeStart <- c(divergeStart, condTimes[i])
@@ -114,13 +112,13 @@ shinyServer(function(input, output) {
     
     rectangles <- data.frame(xstart = divergeStart, xend = divergeEnd)
     
-    # If there is any, add it to the graphs ----
+    # If there is any, add it to the graphs ---------------------------------
     if(length(rectangles) != 0){
       g <-  g + annotate("rect", xmin = rectangles$xstart, xmax = rectangles$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")
       h <-  h + annotate("rect", xmin = rectangles$xstart, xmax = rectangles$xend, ymin = -Inf, ymax = Inf, alpha = 0.2, fill = "steelblue4")
     }
     
-    # Final Output ----
+    # Final Output ----------------------------------------------------------
     list(e, f, g, h, j)
   })
   observeEvent({
@@ -128,13 +126,14 @@ shinyServer(function(input, output) {
     input$slpDvg
     input$conditionNames
   },{
-    output$X340Plot <- renderPlot({plots()[[1]]})
-    output$X380Plot <- renderPlot({plots()[[2]]})
-    output$X340380Plot <- renderPlot({plots()[[3]]})
-    output$X340380DynPlot <- renderPlot({plots()[[4]]})
-    output$SignalToNoise <- renderPlot({plots()[[5]]})
+    # Generates updated plots
+    output$plot340 <- renderPlot(plots()[[1]])
+    output$plot380 <- renderPlot(plots()[[2]])
+    output$plot340380 <- renderPlot(plots()[[3]])
+    output$plot340380Dyn <- renderPlot(plots()[[4]])
+    output$SignalToNoise <- renderPlot(plots()[[5]])
     output$calDFTable <- renderTable(as.data.frame(calData()[[1]]))
-    # Make function
+    # Generates updated downloads
     graphOutput <- function(name, inputname){
       downloadHandler(
         filename = paste0(name, ".pdf"),
@@ -143,7 +142,6 @@ shinyServer(function(input, output) {
         }
       )
     }
-    # Call  
     output$downloadData1 <- graphOutput("340", plots()[[1]])
     output$downloadData2 <- graphOutput("380", plots()[[2]])
     output$downloadData3 <- graphOutput("340\\380", plots()[[3]])
